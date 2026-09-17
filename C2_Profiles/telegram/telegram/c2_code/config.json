@@ -1,0 +1,6 @@
+{
+  "botToken": "",
+  "apiBase": "https://api.telegram.org",
+  "pollTimeout": 20,
+  "mythicGrpc": "http://127.0.0.1:17444"
+}

@@ -1,0 +1,7 @@
+**/bin/
+**/obj/
+C2_Profiles/telegram/telegram/c2_code/telegram
+C2_Profiles/telegram/telegram/c2_code/*.dll
+C2_Profiles/telegram/telegram/c2_code/*.deps.json
+C2_Profiles/telegram/telegram/c2_code/*.runtimeconfig.json
+C2_Profiles/telegram/telegram/c2_code/*.pdb

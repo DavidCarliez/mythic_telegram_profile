@@ -1,0 +1,25 @@
+syntax = "proto3";
+option go_package = "github.com/its-a-feature/Mythic/grpc/services";
+package pushC2Services;
+
+service PushC2 {
+  rpc StartPushC2Streaming (stream PushC2MessageFromAgent) returns (stream PushC2MessageFromMythic) {}
+  rpc StartPushC2StreamingOneToMany (stream PushC2MessageFromAgent) returns (stream PushC2MessageFromMythic) {}
+}
+
+message PushC2MessageFromAgent {
+  string C2ProfileName = 1;
+  string RemoteIP = 2;
+  bytes Message = 3;
+  string OuterUUID = 4;
+  bytes Base64Message = 5;
+  string TrackingID = 6;
+  bool AgentDisconnected = 7;
+}
+
+message PushC2MessageFromMythic {
+  bool Success = 1;
+  string Error = 2;
+  bytes Message = 3;
+  string TrackingID = 4;
+}
