@@ -89,6 +89,8 @@ Select the `telegram` C2 profile while building Athena and provide:
 - This profile uses long polling, not webhooks.
 - A single bot token must not be shared by concurrent agent instances. Their `getUpdates` calls would consume each other's responses.
 - The controller accepts only bot-authored, versioned transport envelopes. Mythic encryption still provides message authentication and confidentiality.
+- Agent requests remain pending until a correlated controller response arrives. Retried requests reuse the same request identifier, and the controller replays cached responses without forwarding duplicate traffic to Mythic.
+- The controller reports a route as disconnected after three missed maximum-jitter callback intervals plus 30 seconds, with a minimum timeout of 60 seconds.
 
 ## Wire format
 
@@ -99,6 +101,9 @@ Each Telegram text message contains a JSON object with these fields:
 - `client_id`: response route identifier
 - `to_server`: direction flag
 - `packet_id`: chunk set identifier
+- `reply_to`: request identifier acknowledged by a controller response
+- `sleep`: current agent callback interval in seconds
+- `jitter`: current agent callback jitter percentage
 - `chunk`: zero-based chunk index
 - `chunks`: total chunk count, limited to 256
 - `message`: encrypted Mythic message fragment

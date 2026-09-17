@@ -19,6 +19,15 @@ internal sealed class TelegramEnvelope
     [JsonPropertyName("packet_id")]
     public string PacketId { get; set; } = string.Empty;
 
+    [JsonPropertyName("reply_to")]
+    public string ReplyToPacketId { get; set; } = string.Empty;
+
+    [JsonPropertyName("sleep")]
+    public int SleepSeconds { get; set; }
+
+    [JsonPropertyName("jitter")]
+    public int JitterPercent { get; set; }
+
     [JsonPropertyName("chunk")]
     public int Chunk { get; set; }
 
