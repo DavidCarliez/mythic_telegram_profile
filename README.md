@@ -24,7 +24,7 @@ Messages use a small JSON envelope and are split into 2,800-character chunks bef
 Run this command from the Mythic directory:
 
 ```shell
-./mythic-cli install github https://github.com/DavidCarliez/telegram
+./mythic-cli install github https://github.com/DavidCarliez/mythic_telegram_profile
 ```
 
 For local development, install the checkout instead:
