@@ -90,6 +90,7 @@ Select the `telegram` C2 profile while building Athena and provide:
 - A single bot token must not be shared by concurrent agent instances. Their `getUpdates` calls would consume each other's responses.
 - The controller accepts only bot-authored, versioned transport envelopes. Mythic encryption still provides message authentication and confidentiality.
 - Agent requests remain pending until a correlated controller response arrives. Retried requests reuse the same request identifier, and the controller replays cached responses without forwarding duplicate traffic to Mythic.
+- Mythic can push tasking when no agent request is pending. The controller queues that tasking and correlates it with the agent's next exchange instead of dropping it.
 - The controller reports a route as disconnected after three missed maximum-jitter callback intervals plus 30 seconds, with a minimum timeout of 60 seconds.
 
 ## Wire format

