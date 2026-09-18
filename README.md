@@ -1,21 +1,23 @@
 # Telegram C2 profile for Mythic
 
-Telegram provides a Mythic C2 profile for the Athena agent. It uses Telegram private bot-to-bot messages as a transport and Mythic's Push C2 gRPC service as the controller bridge.
+Telegram provides a Mythic C2 profile for the [Athena](https://github.com/DavidCarliez/Athena) and [Apollo](https://github.com/DavidCarliez/Apollo) agents. It uses Telegram private bot-to-bot messages as a transport and Mythic's Push C2 gRPC service as the controller bridge.
 
 ## Architecture
 
 ```text
-Athena agent bot <-> Telegram Bot API <-> controller bot <-> Telegram C2 service <-> Mythic
+Athena or Apollo agent bot <-> Telegram Bot API <-> controller bot <-> Telegram C2 service <-> Mythic
 ```
 
-Each running Athena agent uses its own Bot API token. The C2 service uses one controller bot token. Both bots must have Telegram's Bot-to-Bot Communication Mode enabled.
+Each running agent uses its own Bot API token. The C2 service uses one controller bot token. Both bots must have Telegram's Bot-to-Bot Communication Mode enabled.
 
-Messages use a small JSON envelope and are split into 2,800-character chunks before they are sent through `sendMessage`. Agent payloads retain Athena's `aes256_hmac` encryption; the Telegram service forwards encrypted Mythic messages without decrypting them.
+Messages use a small JSON envelope and are split into 2,800-character chunks before they are sent through `sendMessage`. Agent payloads retain their `aes256_hmac` encryption; the Telegram service forwards encrypted Mythic messages without decrypting them.
 
 ## Requirements
 
 - Mythic 3
-- The Athena fork at `https://github.com/DavidCarliez/Athena` with the Telegram transport
+- One supported agent fork with the Telegram transport:
+  - [Athena](https://github.com/DavidCarliez/Athena)
+  - [Apollo](https://github.com/DavidCarliez/Apollo)
 - One Telegram controller bot
 - One Telegram bot for each concurrently running payload instance
 
@@ -33,10 +35,14 @@ For local development, install the checkout instead:
 ./mythic-cli install folder /path/to/telegram -f
 ```
 
-Install the matching Athena branch in the same Mythic deployment:
+Install one of the supported agent forks in the same Mythic deployment:
 
 ```shell
+# Athena
 ./mythic-cli install github https://github.com/DavidCarliez/Athena -b telegram-c2
+
+# Apollo
+./mythic-cli install github https://github.com/DavidCarliez/Apollo -b telegram-c2
 ```
 
 ## Telegram setup
@@ -62,9 +68,9 @@ In Mythic, open **C2 Profiles**, expand the actions for `telegram`, and select *
 
 Save the config, then start the profile.
 
-## Build an Athena payload
+## Build a payload
 
-Select the `telegram` C2 profile while building Athena and provide:
+Select the `telegram` C2 profile while building Athena or Apollo and provide:
 
 | Parameter | Description |
 | --- | --- |
@@ -73,8 +79,8 @@ Select the `telegram` C2 profile while building Athena and provide:
 | `api_base` | Telegram Bot API base URL |
 | `message_checks` | Maximum long polls while waiting for each controller response |
 | `time_between_checks` | Long-poll timeout in seconds |
-| `callback_interval` | Athena callback interval in seconds |
-| `callback_jitter` | Athena callback jitter percentage |
+| `callback_interval` | Agent callback interval in seconds |
+| `callback_jitter` | Agent callback jitter percentage |
 | `AESPSK` | `aes256_hmac` message encryption |
 | `user_agent` | HTTP User-Agent sent to Telegram |
 | `proxy_*` | Optional HTTP proxy settings |
