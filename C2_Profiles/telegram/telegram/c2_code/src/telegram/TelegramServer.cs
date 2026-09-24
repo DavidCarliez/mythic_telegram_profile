@@ -254,7 +254,7 @@ internal sealed class TelegramServer : IDisposable
             for (int attempt = 1; ; attempt++)
             {
                 try { await _telegram.SendDocumentAsync(chatId, data, requestId + ".dat", cancellationToken); break; }
-                catch (Exception ex) when (attempt < 4)
+                catch (Exception) when (attempt < 4)
                 { await Task.Delay(TimeSpan.FromMilliseconds(750 * attempt), ct2: cancellationToken); }
             }
             var marker = new TelegramEnvelope
