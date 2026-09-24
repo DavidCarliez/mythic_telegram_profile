@@ -8,6 +8,7 @@ internal sealed class TelegramServer : IDisposable
 {
     private const int EnvelopeChunkSize = 2800;
     private const int EnvelopeSendDelayMs = 350;
+    private const int DocumentThreshold = 4000;
     private const int MaximumCachedResponses = 16;
     private static readonly TimeSpan CachedResponseLifetime = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan RouteCheckInterval = TimeSpan.FromSeconds(5);
@@ -247,6 +248,24 @@ internal sealed class TelegramServer : IDisposable
         string payload,
         CancellationToken cancellationToken)
     {
+        if (payload.Length > DocumentThreshold)
+        {
+            byte[] data = System.Text.Encoding.UTF8.GetBytes(payload);
+            for (int attempt = 1; ; attempt++)
+            {
+                try { await _telegram.SendDocumentAsync(chatId, data, requestId + ".dat", cancellationToken); break; }
+                catch (Exception ex) when (attempt < 4)
+                { await Task.Delay(TimeSpan.FromMilliseconds(750 * attempt), ct2: cancellationToken); }
+            }
+            var marker = new TelegramEnvelope
+            {
+                ClientId = routeId, ToServer = false,
+                PacketId = Guid.NewGuid().ToString("N"),
+                ReplyToPacketId = requestId, Message = "DOC"
+            };
+            await _telegram.SendTextAsync(chatId, JsonSerializer.Serialize(marker), cancellationToken);
+            return;
+        }
         string packetId = Guid.NewGuid().ToString("N");
         int chunks = Math.Max(1, (payload.Length + EnvelopeChunkSize - 1) / EnvelopeChunkSize);
         for (int index = 0; index < chunks; index++)

